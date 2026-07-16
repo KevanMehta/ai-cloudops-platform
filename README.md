@@ -2,7 +2,7 @@
 
 **Monitor cloud costs, detect anomalies, and get AI-powered operational recommendations — all in one dashboard.**
 
-A production-style full-stack application that helps engineering teams monitor AWS cloud spend, detect billing anomalies, analyze Terraform infrastructure, monitor Kubernetes workloads, and generate actionable optimization recommendations.
+A full-stack reference implementation that demonstrates cloud cost monitoring, billing anomaly detection, Terraform analysis, Kubernetes workload monitoring, and operational recommendations.
 
 ---
 
