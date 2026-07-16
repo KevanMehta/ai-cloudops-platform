@@ -279,3 +279,7 @@ npm run dev
 - RBAC and SSO authentication
 - Kubernetes live metrics via Prometheus adapter
 - Terraform plan diff analysis in CI/CD pipelines
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
