@@ -1,284 +1,148 @@
 # AI CloudOps Platform
 
-**Monitor cloud costs, detect anomalies, and get AI-powered operational recommendations — all in one dashboard.**
+[![CI](https://github.com/KevanMehta/ai-cloudops-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/KevanMehta/ai-cloudops-platform/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A full-stack reference implementation that demonstrates cloud cost monitoring, billing anomaly detection, Terraform analysis, Kubernetes workload monitoring, and operational recommendations.
+A full-stack reference implementation for exploring cloud cost analysis, infrastructure checks, and operational reporting with deterministic demo data.
 
----
+## Why I Built This
+
+I built this project to understand how cost, infrastructure, and workload signals can be normalized behind one API and turned into an explainable operational report. The focus is the system boundary between data collection, rule-based analysis, optional language-model summarization, and a dashboard—not a live cloud-management product.
 
 ## Features
 
-- **Dashboard** — Monthly spend, projections, anomaly counts, cost trends, service breakdown, top recommendations
-- **Cost Anomaly Detection** — Statistical spike detection with severity classification and explanations
-- **AI CloudOps Agent** — LangGraph-style 5-step workflow with optional OpenAI integration and local rule-based fallback
-- **Terraform Analyzer** — Parses IaC for overprovisioning, public storage, missing tags, and missing autoscaling
-- **Kubernetes Monitor** — Pod health, CPU/memory usage, restart counts, and fix recommendations
-- **Recommendations Engine** — Actionable items with severity, savings estimates, and step-by-step actions
-- **Observability** — Prometheus `/metrics` endpoint and structured JSON logging
-- **Demo Data** — 90 days of AWS billing data, 7 intentional anomalies, 8 K8s workloads, 3 Terraform samples
+- Cost dashboard and service-level trends from 90 days of seeded AWS-like billing records
+- Rolling-baseline anomaly detection with persisted explanations
+- Rule-based checks for the bundled Terraform samples
+- Health classification for eight seeded Kubernetes workload records
+- Recommendation generation from cost, anomaly, Terraform, and workload data
+- Five-step reporting workflow with an optional OpenAI-generated summary and deterministic fallback
+- REST API, Swagger documentation, Prometheus metrics, and JSON logs
+- Docker Compose environment for the frontend, API, PostgreSQL, and Redis
 
----
+> [!NOTE]
+> The repository does not connect to AWS or a Kubernetes cluster. Cost, workload, findings, and savings values shown in the UI come from deterministic demo inputs and heuristics.
 
 ## Architecture
 
 ```mermaid
-flowchart TB
-    subgraph Client
-        FE[React + Vite Frontend<br/>:3000]
-    end
-
-    subgraph Backend
-        API[FastAPI API<br/>:8000]
-        AGENT[LangGraph-style Agent]
-        ANOM[Anomaly Detection]
-        REC[Recommendations Engine]
-        TF[Terraform Analyzer]
-        K8S[K8s Monitor]
-    end
-
-    subgraph Data
-        PG[(PostgreSQL)]
-        RD[(Redis Cache)]
-    end
-
-    subgraph Optional
-        OAI[OpenAI API]
-    end
-
-    FE -->|REST| API
-    API --> AGENT
-    API --> ANOM
-    API --> REC
-    API --> TF
-    API --> K8S
-    AGENT --> ANOM
-    AGENT --> REC
-    AGENT --> TF
-    AGENT --> K8S
-    AGENT -.->|optional| OAI
-    API --> PG
-    API --> RD
-    ANOM --> PG
-    REC --> PG
-    TF --> PG
-    K8S --> PG
+flowchart LR
+    Browser[React dashboard] -->|REST| API[FastAPI API]
+    API --> Services[Analysis services]
+    Services --> DB[(PostgreSQL)]
+    API -->|dashboard cache| Redis[(Redis)]
+    Services --> Samples[Bundled Terraform samples]
+    API --> Workflow[Sequential report workflow]
+    Workflow -. optional summary .-> OpenAI[OpenAI API]
 ```
 
----
+FastAPI exposes synchronous endpoints and coordinates stateless analysis services. PostgreSQL stores seeded inputs and derived results. Redis caches only the dashboard response for five minutes; cache failures fall back to PostgreSQL. The React frontend consumes the API through a small typed client.
 
-## Tech Stack
+The reporting workflow runs cost analysis, anomaly detection, infrastructure inspection, recommendation generation, and summary generation in order. It is implemented locally in Python and does not use the LangGraph package.
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS, Recharts |
-| Backend | FastAPI, Python 3.12, Pydantic, SQLAlchemy |
-| Database | PostgreSQL 16 |
-| Cache | Redis 7 |
-| AI | LangGraph-style workflow, optional OpenAI, rule-based fallback |
-| Infra | Docker, Docker Compose |
-| Observability | Prometheus metrics, structured JSON logs |
-| Testing | Pytest (backend), Vitest (frontend) |
-| CI/CD | GitHub Actions |
+## Engineering Decisions
 
----
+- **FastAPI and Pydantic:** keep request validation, response schemas, and generated API documentation close to the Python analysis code. A Java service would provide stronger compile-time constraints but add ceremony to this portfolio-sized system.
+- **PostgreSQL:** stores relational cost records and derived findings with indexed date and service fields. SQLite would simplify startup, but would not demonstrate the same service boundary used by the Docker environment.
+- **Redis:** caches the read-heavy dashboard aggregate with a five-minute TTL. The cache is deliberately nonessential; reads and writes fail open so a Redis outage does not prevent database-backed responses.
+- **Rule-based analysis:** makes anomaly thresholds and infrastructure findings inspectable and repeatable. A learned detector could capture more complex patterns, but would require representative training and evaluation data that this repository does not have.
+- **Optional OpenAI summary:** limits model use to rewriting already-derived facts. When the key is absent or the request fails, the workflow returns a deterministic template.
+- **Docker Compose:** provides a reproducible local topology without claiming a deployment architecture. It is simpler than Kubernetes for the repository's local demonstration scope.
+
+See [docs/decisions.md](docs/decisions.md) for the decision records and consequences.
 
 ## Quick Start
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- (Optional) OpenAI API key for richer agent summaries
-
-### Run with one command
+- Docker with Docker Compose
+- An OpenAI API key only if you want model-generated report summaries
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/KevanMehta/ai-cloudops-platform.git
 cd ai-cloudops-platform
 cp .env.example .env
 docker compose up --build
 ```
 
-After startup (typically 60–90 seconds):
+The database is initialized and demo data is seeded on first startup.
 
 | Service | URL |
-|---------|-----|
-| Frontend | http://localhost:3000 |
-| Backend API | http://localhost:8000 |
-| API Docs (Swagger) | http://localhost:8000/docs |
-| Health Check | http://localhost:8000/health |
-| Prometheus Metrics | http://localhost:8000/metrics |
+| --- | --- |
+| Dashboard | <http://localhost:3000> |
+| API | <http://localhost:8000> |
+| Swagger UI | <http://localhost:8000/docs> |
+| Health check | <http://localhost:8000/health> |
+| Prometheus metrics | <http://localhost:8000/metrics> |
 
-Demo data is seeded automatically on first startup.
+To enable the optional summary integration, set `OPENAI_API_KEY` in `.env` and restart the backend. The configured model is `gpt-4o-mini`.
 
-### Optional: Enable OpenAI
+## API
 
-Add your key to `.env`:
-
-```env
-OPENAI_API_KEY=sk-your-key-here
-```
-
-Restart the backend container. The agent will use GPT-4o-mini for executive summaries; without a key, a deterministic rule-based summary is used.
-
----
-
-## Screenshots
-
-Capture screenshots after starting the app:
-
-1. **Dashboard** — `http://localhost:3000/dashboard`
-2. **Anomalies** — `http://localhost:3000/anomalies`
-3. **AI Agent Report** — Run agent at `http://localhost:3000/agent`
-4. **Terraform Analyzer** — `http://localhost:3000/terraform`
-5. **Kubernetes Health** — `http://localhost:3000/kubernetes`
-
-Save screenshots to `docs/screenshots/` for your portfolio.
-
----
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Health check (DB + Redis status) |
-| GET | `/metrics` | Prometheus metrics |
-| GET | `/api/dashboard` | Dashboard summary data |
-| GET | `/api/costs?days=90` | Cloud billing records |
-| GET | `/api/anomalies` | Detected cost anomalies |
-| GET | `/api/recommendations` | Optimization recommendations |
-| GET | `/api/kubernetes` | Kubernetes workload health |
-| POST | `/api/agent/run` | Run AI CloudOps agent workflow |
-| POST | `/api/terraform/analyze` | Analyze Terraform sample files |
-
----
-
-## Agent Workflow
-
-The AI CloudOps Agent executes a 5-step LangGraph-style pipeline:
-
-1. **Analyze cost data** — Aggregate monthly spend, projections, top services
-2. **Detect anomalies** — Run statistical anomaly detection on billing data
-3. **Inspect infrastructure** — Analyze Terraform samples and Kubernetes workloads
-4. **Generate recommendations** — Produce actionable optimization items
-5. **Executive summary** — OpenAI-enriched or rule-based final report
-
-```mermaid
-flowchart LR
-    A[Analyze Costs] --> B[Detect Anomalies]
-    B --> C[Inspect Infra]
-    C --> D[Generate Recs]
-    D --> E[Executive Summary]
-```
-
----
-
-## Sample Recommendations
-
-| Title | Severity | Est. Savings |
-|-------|----------|--------------|
-| Reduce overprovisioned EC2 instances | High | ~$6,900/mo |
-| Add autoscaling to web tier | Medium | $1,200/mo |
-| Restrict public S3 bucket access | High | — |
-| Investigate EC2 cost spike | High | Variable |
-| Move idle Kubernetes workloads | Medium | ~$150/workload |
-| Add budget alerts | Medium | $800/mo |
-
----
-
-## Project Structure
-
-```
-ai-cloudops-platform/
-├── docker-compose.yml
-├── .env.example
-├── README.md
-├── .github/workflows/ci.yml
-├── backend/
-│   ├── app/
-│   │   ├── main.py
-│   │   ├── config.py
-│   │   ├── database.py
-│   │   ├── models/
-│   │   ├── schemas/
-│   │   ├── services/
-│   │   ├── agent/workflow.py
-│   │   ├── routers/api.py
-│   │   └── seed/
-│   ├── tests/
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── pages/
-│   │   ├── components/
-│   │   ├── api/
-│   │   └── test/
-│   ├── Dockerfile
-│   └── package.json
-└── infra-samples/
-    ├── ec2.tf
-    ├── s3.tf
-    └── eks.tf
-```
-
----
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Report API, PostgreSQL, and Redis status |
+| `GET` | `/metrics` | Expose Prometheus-format process and API metrics |
+| `GET` | `/api/dashboard` | Return cached dashboard aggregates |
+| `GET` | `/api/costs?days=90` | Query seeded cost records |
+| `GET` | `/api/anomalies` | List persisted anomaly results |
+| `GET` | `/api/recommendations` | List heuristic recommendations |
+| `GET` | `/api/kubernetes` | Summarize seeded workload records |
+| `POST` | `/api/terraform/analyze` | Analyze bundled Terraform files |
+| `POST` | `/api/agent/run` | Run the sequential reporting workflow |
 
 ## Testing
 
-### Backend
+The backend suite contains unit tests for anomaly classification, anomaly persistence and deduplication, and recommendation generation. The frontend suite renders `StatCard` and checks its displayed values and optional subtitle. There are currently no PostgreSQL integration, API contract, browser end-to-end, workload-health, Terraform-analyzer, or live-cloud tests.
 
 ```bash
+# Backend
 cd backend
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 pytest -v
-```
 
-### Frontend
-
-```bash
+# Frontend (from the repository root)
 cd frontend
-npm install
+npm ci
 npm test -- --run
 ```
 
-### CI
+GitHub Actions runs both suites, audits frontend dependencies at high severity, and verifies the frontend build on pushes and pull requests targeting `main` or `master`. The backend CI job provisions PostgreSQL and Redis services, although the current unit tests do not exercise them.
 
-GitHub Actions runs both test suites on push/PR to `main`.
+## Project Structure
 
----
-
-## Local Development (without Docker)
-
-**Backend:**
-
-```bash
-cd backend
-pip install -r requirements.txt
-export DATABASE_URL=postgresql://cloudops:cloudops_secret@localhost:5432/cloudops
-export REDIS_URL=redis://localhost:6379/0
-python -m app.seed.init_db
-uvicorn app.main:app --reload --port 8000
+```text
+backend/app/        FastAPI entry point, schemas, persistence, analysis, and seed logic
+backend/tests/      Backend unit tests
+frontend/src/       React pages, shared components, API client, and types
+frontend/src/test/  Frontend component tests
+infra-samples/      Deliberately imperfect Terraform fixtures used by the analyzer
+docs/               Architecture decision records
+.github/             CI, dependency updates, and contribution templates
 ```
 
-**Frontend:**
+## Tradeoffs
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
----
+- The project uses seeded, single-account data; it has no cloud credentials, collectors, or refresh jobs.
+- Terraform files are scanned with regular expressions, not parsed into a complete HCL syntax tree. Findings are educational heuristics and can miss or misclassify valid configurations.
+- Kubernetes health is calculated from stored demo rows, not the Kubernetes API or a metrics system.
+- Savings amounts are fixed or formula-based estimates over demo values. They are not benchmarks, billing forecasts, or validated savings.
+- The API has no authentication or authorization, CORS allows every origin, and the local default database password is public. The environment is intended for local evaluation only.
+- Schema creation uses SQLAlchemy metadata during seeding; Alembic is installed but no migrations are included.
+- The reporting workflow executes synchronously in the API process and has no queue, retries, cancellation, or durable step orchestration.
 
 ## Future Improvements
 
-- Real AWS Cost Explorer and CloudWatch integration via IAM roles
-- Multi-cloud support (GCP, Azure)
-- Slack/PagerDuty alert notifications
-- Historical agent run comparison and trend analysis
-- RBAC and SSO authentication
-- Kubernetes live metrics via Prometheus adapter
-- Terraform plan diff analysis in CI/CD pipelines
+- Replace regex Terraform checks with an HCL parser and fixture-based analyzer tests
+- Add repository-level API and PostgreSQL integration tests
+- Add authentication, restricted CORS, secret management, and database migrations before any shared deployment
+- Define provider interfaces for AWS Cost Explorer and Kubernetes metrics while keeping demo adapters for local use
+- Calibrate recommendation estimates against documented inputs or remove monetary estimates
+- Move long-running report execution to a background worker with explicit run state
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, test, and pull request expectations. Security reports should follow [SECURITY.md](SECURITY.md).
 
 ## License
 
