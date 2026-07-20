@@ -16,7 +16,7 @@ def main():
     db = SessionLocal()
     try:
         init_database(db)
-        logger.info("Seed completed successfully")
+        logger.info("Database initialization completed successfully")
     except Exception as e:
         logger.exception("Seed failed: %s", e)
         sys.exit(1)

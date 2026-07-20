@@ -99,4 +99,5 @@ export interface HealthStatus {
   version: string;
   database: string;
   redis: string;
+  mode: 'demo' | 'connected' | 'offline';
 }

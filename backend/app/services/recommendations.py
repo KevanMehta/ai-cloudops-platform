@@ -22,7 +22,7 @@ def generate_recommendations(db: Session) -> list[Recommendation]:
     # Cost-based: overprovisioned EC2
     ec2_costs = (
         db.query(CloudCost)
-        .filter(CloudCost.service == "EC2")
+        .filter(CloudCost.service.in_(["EC2", "Amazon Elastic Compute Cloud - Compute"]))
         .order_by(CloudCost.date.desc())
         .limit(30)
         .all()
@@ -36,10 +36,10 @@ def generate_recommendations(db: Session) -> list[Recommendation]:
                     title=title,
                     category="cost_optimization",
                     severity="high",
-                    estimated_monthly_savings=round(avg_ec2 * 0.25 * 30, 2),
+                    estimated_monthly_savings=0.0,
                     explanation=(
                         f"EC2 daily spend averages ${avg_ec2:,.2f}. "
-                        "Right-sizing instances and removing idle capacity can reduce costs by ~25%."
+                        "Validate utilization and pricing commitments before estimating savings."
                     ),
                     action_steps=_format_steps([
                         "Audit EC2 instance utilization via CloudWatch metrics",
@@ -65,7 +65,7 @@ def generate_recommendations(db: Session) -> list[Recommendation]:
                     title=title,
                     category="infrastructure",
                     severity="medium",
-                    estimated_monthly_savings=1200.0,
+                    estimated_monthly_savings=0.0,
                     explanation=(
                         f"Found {missing_asg} Terraform resource(s) without autoscaling. "
                         "Fixed capacity leads to over-provisioning during low traffic."
@@ -123,7 +123,7 @@ def generate_recommendations(db: Session) -> list[Recommendation]:
                     title=title,
                     category="governance",
                     severity="low",
-                    estimated_monthly_savings=500.0,
+                    estimated_monthly_savings=0.0,
                     explanation=(
                         f"{missing_tags} resources lack required cost allocation tags. "
                         "Proper tagging enables chargeback and waste identification."
@@ -150,7 +150,7 @@ def generate_recommendations(db: Session) -> list[Recommendation]:
                     title=title,
                     category="anomaly",
                     severity="high",
-                    estimated_monthly_savings=round(anomaly.amount * 20, 2),
+                    estimated_monthly_savings=0.0,
                     explanation=anomaly.explanation,
                     action_steps=_format_steps([
                         f"Review {anomaly.service} usage on {anomaly.date}",
@@ -174,13 +174,12 @@ def generate_recommendations(db: Session) -> list[Recommendation]:
     if idle_workloads:
         title = "Move idle Kubernetes workloads to smaller nodes"
         if title not in existing_titles:
-            savings = len(idle_workloads) * 150.0
             new_recs.append(
                 Recommendation(
                     title=title,
                     category="kubernetes",
                     severity="medium",
-                    estimated_monthly_savings=savings,
+                    estimated_monthly_savings=0.0,
                     explanation=(
                         f"{len(idle_workloads)} workloads show very low resource utilization. "
                         "Consolidating onto smaller node groups reduces compute waste."
@@ -208,7 +207,7 @@ def generate_recommendations(db: Session) -> list[Recommendation]:
                 title=title,
                 category="governance",
                 severity="medium",
-                estimated_monthly_savings=800.0,
+                estimated_monthly_savings=0.0,
                 explanation=(
                     f"Top spender is {top_service} at ${service_totals.get(top_service, 0):,.2f}/month. "
                     "Budget alerts prevent surprise overruns."

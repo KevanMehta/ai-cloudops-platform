@@ -32,6 +32,8 @@ cd frontend && npm test -- --run && npm audit --audit-level=high && npm run buil
 
 Keep pull requests focused. Update tests and documentation when behavior changes, disclose whether data or integrations are simulated, and do not add performance or savings claims without a reproducible method and evidence.
 
+Provider tests must mock the SDK boundary and include at least one failure path. Never run automated tests against a contributor's default AWS account or current Kubernetes context.
+
 ## Commit and Pull Request Notes
 
 - Use a short, imperative commit subject.

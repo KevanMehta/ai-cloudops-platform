@@ -1,8 +1,6 @@
 import logging
-import time
-
 from fastapi import APIRouter, Depends, HTTPException
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.responses import Response
@@ -19,16 +17,21 @@ from app.schemas import (
     CostsResponse,
     DashboardResponse,
     HealthResponse,
+    IntegrationStatus,
     KubernetesResponse,
+    KubernetesSyncResponse,
     KubernetesWorkloadOut,
     RecommendationOut,
     RecommendationsResponse,
     TerraformAnalyzeRequest,
     TerraformAnalyzeResponse,
     TerraformFindingOut,
+    AWSSyncResponse,
 )
+from app.integrations.aws import AWSIntegrationError, sync_aws_costs
+from app.integrations.kubernetes import KubernetesIntegrationError, sync_kubernetes_workloads
 from app.services.anomaly_detection import get_all_anomalies
-from app.services.cache import cache_get, cache_set, check_redis_health
+from app.services.cache import cache_delete, cache_get, cache_set, check_redis_health
 from app.services.dashboard import get_costs, get_dashboard
 from app.services.kubernetes_monitor import get_all_workloads, get_kubernetes_summary
 from app.services.recommendations import generate_recommendations, get_all_recommendations
@@ -38,16 +41,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-REQUEST_COUNT = Counter(
-    "cloudops_http_requests_total",
-    "Total HTTP requests",
-    ["method", "endpoint", "status"],
-)
-REQUEST_LATENCY = Histogram(
-    "cloudops_http_request_duration_seconds",
-    "HTTP request latency",
-    ["endpoint"],
-)
+SYNC_COUNT = Counter("cloudops_provider_sync_total", "Provider sync attempts", ["provider", "status"])
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -63,6 +57,7 @@ def health_check(db: Session = Depends(get_db)):
         version=settings.app_version,
         database=db_status,
         redis=check_redis_health(),
+        mode=settings.operating_mode.value,
     )
 
 
@@ -77,11 +72,7 @@ def dashboard(db: Session = Depends(get_db)):
     if cached:
         return DashboardResponse(**cached)
 
-    start = time.time()
     data = get_dashboard(db)
-    REQUEST_LATENCY.labels(endpoint="dashboard").observe(time.time() - start)
-    REQUEST_COUNT.labels(method="GET", endpoint="dashboard", status="200").inc()
-
     cache_set("dashboard", data.model_dump())
     return data
 
@@ -130,6 +121,54 @@ def kubernetes(db: Session = Depends(get_db)):
     )
 
 
+@router.get("/api/integrations/aws/status", response_model=IntegrationStatus)
+def aws_status():
+    return IntegrationStatus(
+        mode=settings.operating_mode.value,
+        enabled=settings.operating_mode.value == "connected",
+        provider="aws",
+        details={
+            "region": settings.aws_region,
+            "assume_role": bool(settings.aws_role_arn),
+            "lookback_days": settings.aws_cost_lookback_days,
+        },
+    )
+
+
+@router.post("/api/integrations/aws/sync", response_model=AWSSyncResponse)
+def aws_sync(db: Session = Depends(get_db)):
+    try:
+        result = sync_aws_costs(db)
+        cache_delete("dashboard")
+        SYNC_COUNT.labels("aws", "success").inc()
+        return AWSSyncResponse(**result.__dict__)
+    except AWSIntegrationError as exc:
+        SYNC_COUNT.labels("aws", "failure").inc()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get("/api/integrations/kubernetes/status", response_model=IntegrationStatus)
+def kubernetes_status():
+    return IntegrationStatus(
+        mode=settings.operating_mode.value,
+        enabled=settings.operating_mode.value == "connected",
+        provider="kubernetes",
+        details={"context": settings.kubernetes_context or "auto", "metrics_api": False},
+    )
+
+
+@router.post("/api/integrations/kubernetes/sync", response_model=KubernetesSyncResponse)
+def kubernetes_sync(db: Session = Depends(get_db)):
+    try:
+        result = sync_kubernetes_workloads(db)
+        cache_delete("dashboard")
+        SYNC_COUNT.labels("kubernetes", "success").inc()
+        return KubernetesSyncResponse(**result.__dict__)
+    except KubernetesIntegrationError as exc:
+        SYNC_COUNT.labels("kubernetes", "failure").inc()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
 @router.post("/api/agent/run", response_model=AgentRunOut)
 def run_agent(body: AgentRunRequest, db: Session = Depends(get_db)):
     run = run_agent_workflow(
@@ -137,13 +176,16 @@ def run_agent(body: AgentRunRequest, db: Session = Depends(get_db)):
         include_terraform=body.include_terraform,
         include_kubernetes=body.include_kubernetes,
     )
-    cache_set("dashboard", get_dashboard(db).model_dump())
+    cache_delete("dashboard")
     return AgentRunOut.model_validate(run)
 
 
 @router.post("/api/terraform/analyze", response_model=TerraformAnalyzeResponse)
 def terraform_analyze(body: TerraformAnalyzeRequest, db: Session = Depends(get_db)):
-    findings, files = analyze_terraform(db, file_path=body.file_path, persist=True)
+    try:
+        findings, files = analyze_terraform(db, file_path=body.file_path, persist=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     generate_recommendations(db)
     return TerraformAnalyzeResponse(
         findings=[TerraformFindingOut.model_validate(f) for f in findings],

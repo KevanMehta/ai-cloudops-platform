@@ -14,10 +14,14 @@ const navItems = [
 
 export default function Layout() {
   const [health, setHealth] = useState<string>('checking');
+  const [mode, setMode] = useState<string>('unknown');
 
   useEffect(() => {
     api.health()
-      .then((h) => setHealth(h.status))
+      .then((h) => {
+        setHealth(h.status);
+        setMode(h.mode);
+      })
       .catch(() => setHealth('offline'));
   }, []);
 
@@ -62,6 +66,7 @@ export default function Layout() {
             />
             API {health}
           </div>
+          <p className="mt-1 text-xs capitalize text-slate-600">Mode: {mode}</p>
         </div>
       </aside>
       <main className="ml-64 flex-1 p-8">

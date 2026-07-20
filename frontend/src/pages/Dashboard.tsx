@@ -27,7 +27,7 @@ export default function Dashboard() {
     <div>
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-white">Cloud Operations Dashboard</h2>
-        <p className="mt-1 text-slate-400">Real-time overview of cloud spend, anomalies, and optimizations</p>
+        <p className="mt-1 text-slate-400">Stored cost, anomaly, and infrastructure analysis</p>
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">

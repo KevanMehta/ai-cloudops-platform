@@ -135,6 +135,30 @@ class KubernetesResponse(BaseModel):
     cluster_summary: dict[str, int | float]
 
 
+class IntegrationStatus(BaseModel):
+    mode: str
+    enabled: bool
+    provider: str
+    details: dict[str, str | bool | int | float | None]
+
+
+class AWSSyncResponse(BaseModel):
+    account_id: str
+    records_imported: int
+    period_start: date
+    period_end: date
+    budget_count: int
+    budgets_over_limit: int
+    estimated_month_to_date_cost: Optional[float]
+    warnings: list[str] = Field(default_factory=list)
+
+
+class KubernetesSyncResponse(BaseModel):
+    workloads_imported: int
+    context: str
+    metrics_available: bool
+
+
 class TerraformAnalyzeRequest(BaseModel):
     file_path: Optional[str] = Field(
         default=None, description="Specific file to analyze; defaults to all samples"
@@ -157,3 +181,4 @@ class HealthResponse(BaseModel):
     version: str
     database: str
     redis: str
+    mode: str

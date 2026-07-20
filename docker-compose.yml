@@ -34,11 +34,22 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-cloudops}:${POSTGRES_PASSWORD:-cloudops_secret}@postgres:5432/${POSTGRES_DB:-cloudops}
       REDIS_URL: redis://redis:6379/0
+      OPERATING_MODE: ${OPERATING_MODE:-demo}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       INFRA_SAMPLES_PATH: /app/infra-samples
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ROLE_ARN: ${AWS_ROLE_ARN:-}
+      AWS_EXTERNAL_ID: ${AWS_EXTERNAL_ID:-}
+      AWS_SESSION_NAME: ${AWS_SESSION_NAME:-cloudops-platform}
+      AWS_COST_LOOKBACK_DAYS: ${AWS_COST_LOOKBACK_DAYS:-90}
+      AWS_PROFILE: ${AWS_PROFILE:-}
+      KUBERNETES_CONTEXT: ${KUBERNETES_CONTEXT:-}
     volumes:
       - ./infra-samples:/app/infra-samples:ro
+      - ${AWS_CONFIG_DIR:-./.local/aws}:/home/app/.aws:ro
+      - ${KUBECONFIG_PATH:-./.local/kube/config}:/home/app/.kube/config:ro
     depends_on:
       postgres:
         condition: service_healthy

@@ -98,10 +98,10 @@ export default function KubernetesHealth() {
                     <div className="h-2 w-16 rounded-full bg-slate-800">
                       <div
                         className={`h-2 rounded-full ${w.cpu_usage_percent > 90 ? 'bg-red-500' : 'bg-brand-500'}`}
-                        style={{ width: `${Math.min(w.cpu_usage_percent, 100)}%` }}
+                        style={{ width: `${Math.max(0, Math.min(w.cpu_usage_percent, 100))}%` }}
                       />
                     </div>
-                    <span className="text-slate-400">{w.cpu_usage_percent}%</span>
+                    <span className="text-slate-400">{w.cpu_usage_percent >= 0 ? `${w.cpu_usage_percent}%` : 'N/A'}</span>
                   </div>
                 </td>
                 <td className="py-3 pr-4">
@@ -109,10 +109,10 @@ export default function KubernetesHealth() {
                     <div className="h-2 w-16 rounded-full bg-slate-800">
                       <div
                         className={`h-2 rounded-full ${w.memory_usage_percent > 90 ? 'bg-red-500' : 'bg-purple-500'}`}
-                        style={{ width: `${Math.min(w.memory_usage_percent, 100)}%` }}
+                        style={{ width: `${Math.max(0, Math.min(w.memory_usage_percent, 100))}%` }}
                       />
                     </div>
-                    <span className="text-slate-400">{w.memory_usage_percent}%</span>
+                    <span className="text-slate-400">{w.memory_usage_percent >= 0 ? `${w.memory_usage_percent}%` : 'N/A'}</span>
                   </div>
                 </td>
                 <td className={`py-3 pr-4 ${w.restart_count > 10 ? 'font-bold text-red-400' : 'text-slate-400'}`}>

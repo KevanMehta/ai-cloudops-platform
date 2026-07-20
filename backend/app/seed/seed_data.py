@@ -15,6 +15,7 @@ from app.services.anomaly_detection import detect_anomalies
 from app.services.recommendations import generate_recommendations
 from app.services.terraform_analyzer import analyze_terraform
 from app.database import Base, engine
+from app.config import OperatingMode, settings
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +150,9 @@ def seed_kubernetes(db: Session) -> None:
 
 def init_database(db: Session) -> None:
     Base.metadata.create_all(bind=engine)
+    if settings.operating_mode is not OperatingMode.demo:
+        logger.info("Database schema initialized without demo data", extra={"mode": settings.operating_mode.value})
+        return
     seed_cloud_costs(db)
     seed_intentional_anomalies(db)
     seed_kubernetes(db)
