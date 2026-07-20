@@ -11,3 +11,4 @@ htmlcov/
 .vite/
 *.log
 .DS_Store
+.local/

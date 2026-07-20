@@ -33,6 +33,15 @@ def cache_set(key: str, value: dict | list, ttl: int = 300) -> None:
         logger.warning("Redis cache set failed: %s", e)
 
 
+def cache_delete(*keys: str) -> None:
+    if not keys:
+        return
+    try:
+        get_redis().delete(*keys)
+    except Exception as e:
+        logger.warning("Redis cache delete failed: %s", e)
+
+
 def check_redis_health() -> str:
     try:
         get_redis().ping()

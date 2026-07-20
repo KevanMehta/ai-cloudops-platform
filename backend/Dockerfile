@@ -12,6 +12,9 @@ COPY . .
 
 RUN chmod +x entrypoint.sh
 
+RUN useradd --create-home --uid 10001 app
+USER app
+
 EXPOSE 8000
 
 ENTRYPOINT ["./entrypoint.sh"]

@@ -19,15 +19,15 @@ def assess_health(workload: KubernetesWorkload) -> tuple[str, str | None]:
             f"High restart count ({workload.restart_count}). "
             "Inspect crash loop logs and liveness probe configuration."
         )
-    if workload.cpu_usage_percent > 90:
+    if workload.cpu_usage_percent >= 0 and workload.cpu_usage_percent > 90:
         return "warning", (
             "CPU usage above 90%. Increase resource limits or add horizontal pod autoscaler."
         )
-    if workload.memory_usage_percent > 90:
+    if workload.memory_usage_percent >= 0 and workload.memory_usage_percent > 90:
         return "warning", (
             "Memory usage above 90%. Increase memory limits or investigate memory leaks."
         )
-    if workload.cpu_usage_percent < 5 and workload.memory_usage_percent < 10:
+    if 0 <= workload.cpu_usage_percent < 5 and 0 <= workload.memory_usage_percent < 10:
         return "idle", (
             "Very low utilization. Consider reducing replicas or moving to smaller node pool."
         )
@@ -38,8 +38,10 @@ def get_kubernetes_summary(db: Session) -> dict:
     workloads = db.query(KubernetesWorkload).all()
     unhealthy = sum(1 for w in workloads if w.health in ("unhealthy", "warning"))
     idle = sum(1 for w in workloads if w.health == "idle")
-    avg_cpu = sum(w.cpu_usage_percent for w in workloads) / len(workloads) if workloads else 0
-    avg_mem = sum(w.memory_usage_percent for w in workloads) / len(workloads) if workloads else 0
+    cpu_samples = [w.cpu_usage_percent for w in workloads if w.cpu_usage_percent >= 0]
+    memory_samples = [w.memory_usage_percent for w in workloads if w.memory_usage_percent >= 0]
+    avg_cpu = sum(cpu_samples) / len(cpu_samples) if cpu_samples else 0
+    avg_mem = sum(memory_samples) / len(memory_samples) if memory_samples else 0
 
     return {
         "total_workloads": len(workloads),
